@@ -13,10 +13,9 @@ interface Carrier {
   driver_license?: string;
   is_active: boolean;
   rating: number;
-  profiles: {
-    full_name: string;
-    phone?: string;
-  };
+  user_id: string;
+  full_name?: string;
+  phone?: string;
 }
 
 const CarrierManager = () => {
@@ -30,16 +29,35 @@ const CarrierManager = () => {
 
   const fetchCarriers = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: carriersData, error: carriersError } = await supabase
         .from('carriers')
-        .select(`
-          *,
-          profiles(full_name, phone)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCarriers(data || []);
+      if (carriersError) throw carriersError;
+
+      // Fetch profiles for each carrier
+      if (carriersData && carriersData.length > 0) {
+        const userIds = carriersData.map(carrier => carrier.user_id);
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('user_id, full_name, phone')
+          .in('user_id', userIds);
+
+        // Merge carriers with profile data
+        const carriersWithProfiles = carriersData.map(carrier => {
+          const profile = profilesData?.find(p => p.user_id === carrier.user_id);
+          return {
+            ...carrier,
+            full_name: profile?.full_name || 'Nome não encontrado',
+            phone: profile?.phone || null
+          };
+        });
+
+        setCarriers(carriersWithProfiles);
+      } else {
+        setCarriers([]);
+      }
     } catch (error: any) {
       toast({
         title: "Erro ao carregar freteiros",
@@ -101,10 +119,10 @@ const CarrierManager = () => {
                 {carriers.map((carrier) => (
                   <TableRow key={carrier.id}>
                     <TableCell className="font-medium">
-                      {carrier.profiles.full_name}
+                      {carrier.full_name}
                     </TableCell>
                     <TableCell>
-                      {carrier.profiles.phone || 'Não informado'}
+                      {carrier.phone || 'Não informado'}
                     </TableCell>
                     <TableCell>{carrier.vehicle_type}</TableCell>
                     <TableCell>
