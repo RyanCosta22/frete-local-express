@@ -34,7 +34,7 @@ const CarrierManager = () => {
         .from('carriers')
         .select(`
           *,
-          profiles!carriers_user_id_fkey(full_name, phone)
+          profiles(full_name, phone)
         `)
         .order('created_at', { ascending: false });
 
